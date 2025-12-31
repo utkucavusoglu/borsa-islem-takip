@@ -1,1 +1,184 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+<title>Borsa İşlem Takip</title>
 
+<!-- Telegram Mini App -->
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+
+<style>
+body {
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 16px;
+  background: var(--tg-theme-bg-color, #ffffff);
+  color: var(--tg-theme-text-color, #000000);
+}
+.container { max-width: 900px; margin: auto; }
+h1 { text-align: center; }
+
+.form-row {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.form-group {
+  flex: 1 1 180px;
+}
+label {
+  display: block;
+  margin-bottom: 6px;
+  font-weight: 600;
+}
+input, select {
+  width: 100%;
+  padding: 8px;
+  border-radius: 6px;
+  border: 1px solid #ccc;
+}
+
+.button-group {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+}
+button {
+  padding: 10px;
+  border-radius: 6px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  color: white;
+  flex: 1;
+}
+.btn-deposit { background:#2e7d32; }
+.btn-withdraw { background:#c62828; }
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 15px;
+}
+th, td {
+  border: 1px solid #ddd;
+  padding: 8px;
+  text-align: center;
+  font-size: 14px;
+}
+.deposit-row { background:#d0f0c0; }
+.withdraw-row { background:#ffd6d6; }
+
+.actions button {
+  margin: 2px;
+  padding: 6px;
+  border-radius: 6px;
+}
+.edit-btn { background:#1976d2; color:#fff; }
+.delete-btn { background:#d32f2f; color:#fff; }
+
+.stats {
+  margin-top: 10px;
+  padding: 10px;
+  background:#f5f5f5;
+  border-radius:6px;
+}
+</style>
+</head>
+
+<body>
+<div class="container">
+<h1>📊 Borsa İşlem Takip</h1>
+
+<div class="form-row">
+  <div class="form-group">
+    <label>Miktar (USD)</label>
+    <input id="amount" type="number" step="0.01">
+  </div>
+  <div class="form-group">
+    <label>Tarih</label>
+    <input id="date" type="datetime-local">
+  </div>
+  <div class="form-group">
+    <label>Açıklama</label>
+    <input id="desc" type="text">
+  </div>
+</div>
+
+<div class="button-group">
+  <button class="btn-deposit" onclick="addTx('Yatırma')">Yatır</button>
+  <button class="btn-withdraw" onclick="addTx('Çekme')">Çek</button>
+</div>
+
+<h3>Toplam Bakiye: <span id="balance">0.00</span> USD</h3>
+
+<table>
+<thead>
+<tr>
+<th>Tarih</th><th>Tür</th><th>Miktar</th><th>Açıklama</th><th>Bakiye</th><th></th>
+</tr>
+</thead>
+<tbody id="list"></tbody>
+</table>
+
+<div class="stats" id="stats"></div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if (tg) {
+  tg.ready();
+  tg.expand();
+}
+
+const KEY = "borsa_tx";
+
+function load(){ return JSON.parse(localStorage.getItem(KEY)||"[]"); }
+function save(d){ localStorage.setItem(KEY,JSON.stringify(d)); }
+function uid(){ return Date.now()+Math.random().toString(36); }
+
+function addTx(type){
+  const a = parseFloat(amount.value);
+  if(!a || a<=0) return alert("Miktar gir");
+  const t = date.value ? new Date(date.value).getTime() : Date.now();
+  const d = load();
+  d.push({id:uid(),type,amount:a,time:t,desc:desc.value});
+  save(d);
+  amount.value=desc.value=date.value="";
+  render();
+}
+
+function del(id){
+  if(confirm("Silinsin mi?")){
+    save(load().filter(x=>x.id!==id));
+    render();
+  }
+}
+
+function render(){
+  const d = load().sort((a,b)=>a.time-b.time);
+  let bal=0;
+  list.innerHTML="";
+  d.forEach(x=>{
+    bal += x.type==="Yatırma"?x.amount:-x.amount;
+    list.innerHTML+=`
+<tr class="${x.type==="Yatırma"?"deposit-row":"withdraw-row"}">
+<td>${new Date(x.time).toLocaleString("tr-TR")}</td>
+<td>${x.type}</td>
+<td>${x.amount.toFixed(2)}</td>
+<td>${x.desc||""}</td>
+<td>${bal.toFixed(2)}</td>
+<td><button class="delete-btn" onclick="del('${x.id}')">Sil</button></td>
+</tr>`;
+  });
+  balance.textContent=bal.toFixed(2);
+  const dep=d.filter(x=>x.type==="Yatırma").reduce((s,x)=>s+x.amount,0);
+  const wit=d.filter(x=>x.type==="Çekme").reduce((s,x)=>s+x.amount,0);
+  stats.innerHTML=`💰 Yatırma: ${dep.toFixed(2)} | 💸 Çekme: ${wit.toFixed(2)}`;
+}
+
+render();
+</script>
+</body>
+</html>
